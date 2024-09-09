@@ -4,6 +4,8 @@ const app = express();
 const mongoose = require('mongoose');
 const bookRoutes = require('./routes/routes.js');
 const userRoutes = require ('./routes/user.js');
+const path = require('path');
+
 
 app.use(cors());
 
@@ -22,6 +24,8 @@ mongoose.connect('mongodb+srv://75017pi:T5BYZOWTegrmGu9O@cluster6.gahlt.mongodb.
 
 app.use('/api/books', bookRoutes);
 app.use('/api/auth', userRoutes);
+app.use('./images', express.static(path.join(__dirname, 'images')));
+
 
 module.exports = app;
 
