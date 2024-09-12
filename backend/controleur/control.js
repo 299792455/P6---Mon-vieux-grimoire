@@ -23,8 +23,8 @@ exports.createBook = (req, res, next) => {
 };
 
 exports.rateBook = (req, res, next) => {
-  const rating = req.body.rating; // Note fournie par l'utilisateur
-  const userId = req.auth.userId; // ID de l'utilisateur connecté
+  const rating = req.body.rating; 
+  const userId = req.auth.userId; 
 
   if (rating < 0 || rating > 5) {
     return res.status(400).json({ message: 'Rating should be between 0 and 5' });
