@@ -5,13 +5,14 @@ const mongoose = require('mongoose');
 const bookRoutes = require('./routes/routes.js');
 const userRoutes = require ('./routes/user.js');
 const path = require('path');
+require ('dotenv').config();
 
 
 app.use(cors());
 
 app.use(express.json());
 
-mongoose.connect('mongodb+srv://75017pi:T5BYZOWTegrmGu9O@cluster6.gahlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster6')
+mongoose.connect(process.env.URLBDD)
     .then(() => console.log('Connexion à MongoDB réussie !'))
     .catch(() => console.log('Connexion à MongoDB échouée !'));
 

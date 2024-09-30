@@ -1,8 +1,18 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/users');
 const jwt = require('jsonwebtoken');
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; //me suis stopé à @ ? faut inclure les tous les .machins du monde ?
 
 exports.signup = (req, res, next) => {
+    if (!passwordRegex.test(req.body.password)) {
+        return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.' });
+    }
+
+    if (!emailRegex.test(req.body.email)) {
+        return res.status(400).json({ error: 'L\'adresse e-mail n\'est pas valide.' });
+    }
+
     bcrypt.hash(req.body.password, 10)
       .then(hash => {
         const user = new User({
@@ -31,7 +41,7 @@ exports.signup = (req, res, next) => {
                         userId: user._id,
                         token: jwt.sign(
                             { userId: user._id },
-                            'RANDOM_TOKEN_SECRET',
+                            process.env.SIGNATURE,
                             { expiresIn: '24h' }
                         )
                     });
