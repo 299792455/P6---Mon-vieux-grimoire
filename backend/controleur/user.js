@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const User = require('../models/users');
 const jwt = require('jsonwebtoken');
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; //me suis stopé à @ ? faut inclure les tous les .machins du monde ?
+const emailRegex = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/i; //me suis stopé à @ ? faut inclure les tous les .machins du monde ?
 
 exports.signup = (req, res, next) => {
     if (!passwordRegex.test(req.body.password)) {
