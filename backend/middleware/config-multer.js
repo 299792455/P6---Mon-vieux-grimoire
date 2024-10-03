@@ -1,20 +1,27 @@
 const multer = require('multer');
+const sharp = require('sharp');
 
 const MIME_TYPES = {
-    'image/jpg':'jpg',
+    'image/jpg': 'jpg',
     'image/jpeg': 'jpeg',
-    'image/png':'png',
-}; //question : y'a que le mimetype pour recup l'extension ? pas d'autres moyens ?
+    'image/png': 'png',
+};
 
-const storage= multer.diskStorage ({
-    destination: (req, file, callback) => {
-        callback(null,'images');
+// Utiliser memoryStorage pour stocker les fichiers en mémoire
+const storage = multer.memoryStorage();
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        if (MIME_TYPES[file.mimetype]) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid mime type'), false);
+        }
     },
-    filename: (req,file,callback) => {
-        const name = file.originalname.split(' ').join('_');
-        const extension = MIME_TYPES[file.mimetype];
-        callback(null, name + Date.now() + '.' + extension);
+    limits: {
+        fileSize: 5 * 1024 * 1024 // Limite de taille de fichier (5MB par exemple)
     }
-}); //Horodatage pr le rendre le plus spécifique possible : en gros, chaud de faire 2 meme fichier à la meme milliseconde près. Autre moyen de rendre plus unique ?
+}).single('image');
 
-module.exports = multer({storage: storage}).single('image');
+module.exports = upload;
