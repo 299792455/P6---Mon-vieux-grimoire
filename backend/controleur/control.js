@@ -24,40 +24,28 @@ exports.createBook = async (req, res, next) => {
         delete bookObject._userId;
 
         if (!req.file) {
-            return res.status(400).json({ message: 'Image file is required' });
+            return res.status(400).json({ message: 'Aucune image téléchargée' });
         }
 
         const extension = MIME_TYPES[req.file.mimetype];
         if (!extension) {
-            return res.status(400).json({ message: 'Unsupported file type' });
+            return res.status(400).json({ message: 'Type de fichier non supporté' });
         }
 
+        // Générer un nom de fichier unique
         const filename = generateFilename(req.file.originalname, extension);
-        const filePath = path.join('images', filename);
+        const filepath = path.join(__dirname, '..', 'images', filename);
 
-        // Initialiser le pipeline Sharp avec redimensionnement et options de compression
-        let imagePipeline = sharp(req.file.buffer)
-            .resize({ width: 800, withoutEnlargement: true });
+        // Optimiser l'image avec Sharp et l'enregistrer sur le disque
+        await sharp(req.file.buffer)
+            .resize(800, 800, {
+                fit: sharp.fit.inside,
+                withoutEnlargement: true,
+            })
+            .toFormat('jpeg', { quality: 80 }) // Convertir en JPEG avec qualité 80%
+            .toFile(filepath);
 
-        // Appliquer des options spécifiques selon le format
-        if (extension === 'jpeg' || extension === 'jpg') {
-            imagePipeline = imagePipeline.jpeg({ quality: 70, mozjpeg: true });
-        } else if (extension === 'png') {
-            imagePipeline = imagePipeline.png({ compressionLevel: 8, adaptiveFiltering: true });
-        }
-
-        // Enregistrer l'image optimisée sur le disque
-        await imagePipeline.toFile(filePath);
-
-        // Récupérer les métadonnées de l'image optimisée
-        const metadata = await sharp(filePath).metadata();
-        console.log('Image optimisée:', {
-            width: metadata.width,
-            height: metadata.height,
-            format: metadata.format,
-            size: fs.statSync(filePath).size, // Taille en octets
-        });
-
+        // Créer un nouvel objet Book avec le chemin de l'image optimisée
         const book = new Book({
             ...bookObject,
             userId: req.auth.userId,
@@ -66,12 +54,14 @@ exports.createBook = async (req, res, next) => {
 
         await book.save();
         console.log('Book saved successfully');
-        res.status(201).json({ message: 'Book saved successfully!' });
+        res.status(201).json({ message: 'Book saved successfully!', book });
     } catch (error) {
         console.error('Error saving book:', error);
         res.status(400).json({ error: error.message });
     }
 };
+
+
 
 exports.rateBook = (req, res, next) => {
     const rating = req.body.rating;
@@ -150,52 +140,7 @@ exports.getOneBook = (req, res, next) => {
 exports.modifyBook = async (req, res, next) => {
     try {
         const bookId = req.params.id;
-        let bookObject = {};
-
-        if (req.file) {
-            const extension = MIME_TYPES[req.file.mimetype];
-            if (!extension) {
-                return res.status(400).json({ message: 'Unsupported file type' });
-            }
-
-            const filename = generateFilename(req.file.originalname, extension);
-            const filePath = path.join('images', filename);
-
-            // Initialiser le pipeline Sharp avec redimensionnement et options de compression
-            let imagePipeline = sharp(req.file.buffer)
-                .resize({ width: 800, withoutEnlargement: true });
-
-            // Appliquer des options spécifiques selon le format
-            if (extension === 'jpeg' || extension === 'jpg') {
-                imagePipeline = imagePipeline.jpeg({ quality: 70, mozjpeg: true });
-            } else if (extension === 'png') {
-                imagePipeline = imagePipeline.png({ compressionLevel: 8, adaptiveFiltering: true });
-            }
-
-            // Enregistrer l'image optimisée sur le disque
-            await imagePipeline.toFile(filePath);
-
-            // Récupérer les métadonnées de l'image optimisée
-            const metadata = await sharp(filePath).metadata();
-            console.log('Image optimisée:', {
-                width: metadata.width,
-                height: metadata.height,
-                format: metadata.format,
-                size: fs.statSync(filePath).size, // Taille en octets
-            });
-
-            bookObject = {
-                ...JSON.parse(req.body.book),
-                imageUrl: `${req.protocol}://${req.get('host')}/images/${filename}`
-            };
-        } else {
-            bookObject = { ...req.body };
-        }
-
-        delete bookObject._userId;
-
         const book = await Book.findOne({ _id: bookId });
-
         if (!book) {
             return res.status(404).json({ message: 'Book not found' });
         }
@@ -204,14 +149,42 @@ exports.modifyBook = async (req, res, next) => {
             return res.status(401).json({ message: 'Not authorized' });
         }
 
-        if (req.file && book.imageUrl) {
-            const oldFilename = book.imageUrl.split('/images/')[1];
-            fs.unlink(path.join('images', oldFilename), (err) => {
-                if (err) console.error('Failed to delete old image:', err);
-            });
+        let bookObject = { ...JSON.parse(req.body.book) };
+        delete bookObject._userId;
+
+        if (req.file) {
+            // Supprimer l'ancienne image si elle existe
+            if (book.imageUrl) {
+                const oldFilename = path.basename(book.imageUrl);
+                const oldFilePath = path.join(__dirname, '..', 'images', oldFilename);
+                fs.unlink(oldFilePath, (err) => {
+                    if (err) console.error('Erreur lors de la suppression de l\'ancienne image:', err);
+                });
+            }
+
+            const extension = MIME_TYPES[req.file.mimetype];
+            if (!extension) {
+                return res.status(400).json({ message: 'Type de fichier non supporté' });
+            }
+
+            // Générer un nom de fichier unique
+            const filename = generateFilename(req.file.originalname, extension);
+            const filepath = path.join(__dirname, '..', 'images', filename);
+
+            // Optimiser l'image avec Sharp et l'enregistrer sur le disque
+            await sharp(req.file.buffer)
+                .resize(800, 800, {
+                    fit: sharp.fit.inside,
+                    withoutEnlargement: true,
+                })
+                .toFormat('jpeg', { quality: 80 }) // Convertir en JPEG avec qualité 80%
+                .toFile(filepath);
+
+            // Mettre à jour le chemin de l'image
+            bookObject.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
         }
 
-        // Gestion du rating si présent
+        // Gérer le rating si présent
         if (req.body.rating) {
             const rating = parseInt(req.body.rating);
             const userId = req.auth.userId;
@@ -225,15 +198,17 @@ exports.modifyBook = async (req, res, next) => {
                 return res.status(400).json({ message: 'User has already rated this book' });
             }
 
-            book.ratings.push({ userId: userId, grade: rating });
-            const totalRatings = book.ratings.reduce((sum, r) => sum + r.grade, 0);
-            book.averageRating = parseFloat((totalRatings / book.ratings.length).toFixed(2));
+            bookObject.ratings = book.ratings;
+            bookObject.ratings.push({ userId, grade: rating });
+            const totalRatings = bookObject.ratings.reduce((sum, r) => sum + r.grade, 0);
+            bookObject.averageRating = parseFloat((totalRatings / bookObject.ratings.length).toFixed(2));
         }
 
-        await Book.updateOne({ _id: bookId }, { ...bookObject, _id: bookId });
-        res.status(200).json({ message: 'Book updated successfully!', book: { ...bookObject, _id: bookId } });
+        // Mettre à jour le livre
+        const updatedBook = await Book.findByIdAndUpdate(bookId, { ...bookObject }, { new: true });
+        res.status(200).json({ message: 'Book updated successfully!', book: updatedBook });
     } catch (error) {
-        console.error('Error modifying book:', error);
+        console.error('Error updating book:', error);
         res.status(400).json({ error: error.message });
     }
 };

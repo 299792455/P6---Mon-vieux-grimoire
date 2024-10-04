@@ -7,7 +7,6 @@ const MIME_TYPES = {
     'image/png': 'png',
 };
 
-// Utiliser memoryStorage pour stocker les fichiers en mémoire
 const storage = multer.memoryStorage();
 
 const upload = multer({ 
@@ -20,7 +19,7 @@ const upload = multer({
         }
     },
     limits: {
-        fileSize: 5 * 1024 * 1024 // Limite de taille de fichier (5MB par exemple)
+        fileSize: 5 * 1024 * 1024 // Limite de taille de fichier (5MB ? Parait énorme...)
     }
 }).single('image');
 
