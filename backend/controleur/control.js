@@ -2,7 +2,6 @@
 const Book = require('../models/books');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
-const sharp = require('sharp');
 const path = require('path');
 
 const MIME_TYPES = {
@@ -11,11 +10,6 @@ const MIME_TYPES = {
     'image/png': 'png',
 };
 
-// Fonction pour générer un nom de fichier unique
-const generateFilename = (originalName, extension) => {
-    const name = originalName.split(' ').join('_').split('.')[0];
-    return `${name}_${Date.now()}.${extension}`;
-};
 
 exports.createBook = async (req, res, next) => {
     try {
@@ -23,33 +17,20 @@ exports.createBook = async (req, res, next) => {
         delete bookObject._id;
         delete bookObject._userId;
 
-        if (!req.file) {
-            return res.status(400).json({ message: 'Aucune image téléchargée' });
+        if (req.file && !req.optimizedImage) {
+            return res.status(400).json({ message: 'Erreur lors de l\'optimisation de l\'image' });
         }
 
-        const extension = MIME_TYPES[req.file.mimetype];
-        if (!extension) {
-            return res.status(400).json({ message: 'Type de fichier non supporté' });
+        let imageUrl = '';
+        if (req.optimizedImage) {
+            imageUrl = `${req.protocol}://${req.get('host')}/images/${req.optimizedImage.filename}`;
         }
 
-        // Générer un nom de fichier unique
-        const filename = generateFilename(req.file.originalname, extension);
-        const filepath = path.join(__dirname, '..', 'images', filename);
-
-        // Optimiser l'image avec Sharp et l'enregistrer sur le disque
-        await sharp(req.file.buffer)
-            .resize(800, 800, {
-                fit: sharp.fit.inside,
-                withoutEnlargement: true,
-            })
-            .toFormat('jpeg', { quality: 80 }) // Convertir en JPEG avec qualité 80%
-            .toFile(filepath);
-
-        // Créer un nouvel objet Book avec le chemin de l'image optimisée
+        // Nouvel objet Book avec le chemin de l'image optimisée
         const book = new Book({
             ...bookObject,
             userId: req.auth.userId,
-            imageUrl: `${req.protocol}://${req.get('host')}/images/${filename}`,
+            imageUrl: imageUrl,
         });
 
         await book.save();
@@ -152,7 +133,7 @@ exports.modifyBook = async (req, res, next) => {
         let bookObject = { ...JSON.parse(req.body.book) };
         delete bookObject._userId;
 
-        if (req.file) {
+        if (req.file && req.optimizedImage) {
             // Supprimer l'ancienne image si elle existe
             if (book.imageUrl) {
                 const oldFilename = path.basename(book.imageUrl);
@@ -162,26 +143,8 @@ exports.modifyBook = async (req, res, next) => {
                 });
             }
 
-            const extension = MIME_TYPES[req.file.mimetype];
-            if (!extension) {
-                return res.status(400).json({ message: 'Type de fichier non supporté' });
-            }
-
-            // Générer un nom de fichier unique
-            const filename = generateFilename(req.file.originalname, extension);
-            const filepath = path.join(__dirname, '..', 'images', filename);
-
-            // Optimiser l'image avec Sharp et l'enregistrer sur le disque
-            await sharp(req.file.buffer)
-                .resize(800, 800, {
-                    fit: sharp.fit.inside,
-                    withoutEnlargement: true,
-                })
-                .toFormat('jpeg', { quality: 80 }) // Convertir en JPEG avec qualité 80%
-                .toFile(filepath);
-
             // Mettre à jour le chemin de l'image
-            bookObject.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
+            bookObject.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.optimizedImage.filename}`;
         }
 
         // Gérer le rating si présent
